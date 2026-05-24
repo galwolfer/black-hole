@@ -46,7 +46,7 @@ function isHoleInRange(hole: BlackHole, hand: HandFrame, frameWidth: number, fra
     x: hand.palmPoint.x * frameWidth,
     y: hand.palmPoint.y * frameHeight,
   };
-  return getDistance(handPoint, { x: hole.x, y: hole.y }) < hole.radius * 1.5;
+  return getDistance(handPoint, { x: hole.x, y: hole.y }) < hole.radius * 0.7;
 }
 
 function createHole(point: Point, handSpan: number, width: number, height: number, now: number): BlackHole {
@@ -266,7 +266,7 @@ export default function App() {
       hole.id = holeIdRef.current;
       holeIdRef.current += 1;
 
-      if (mode === 'solo') {
+      if (modeRef.current === 'solo') {
         soloHoleRef.current = hole;
         return;
       }
