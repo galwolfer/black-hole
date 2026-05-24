@@ -6,8 +6,10 @@ export type Point = {
 export type HandFrame = {
   label: string;
   landmarks: Point[];
+  palmPoint: Point;
   pinchPoint: Point | null;
   isPinching: boolean;
+  openness: number;
   handSpan: number;
 };
 
@@ -53,6 +55,22 @@ export function distance(a: { x: number; y: number }, b: { x: number; y: number 
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+export function averagePoint(points: Array<{ x: number; y: number }>): Point {
+  const total = points.reduce(
+    (accumulator, point) => {
+      accumulator.x += point.x;
+      accumulator.y += point.y;
+      return accumulator;
+    },
+    { x: 0, y: 0 },
+  );
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length,
+  };
+}
+
 export function generateStars(count: number): Star[] {
   return Array.from({ length: count }, () => ({
     x: Math.random(),
@@ -73,9 +91,12 @@ export function getHandFrames(result: any): HandFrame[] {
     const indexMcp = handLandmarks[5];
     const pinkyMcp = handLandmarks[17];
     const middleMcp = handLandmarks[9];
+    const palmPoint = mirrorPoint(averagePoint([wrist, indexMcp, middleMcp, pinkyMcp]));
     const span = Math.max(distance(indexMcp, pinkyMcp), distance(wrist, middleMcp), 0.12);
     const pinchDistance = distance(thumbTip, indexTip);
-    const isPinching = pinchDistance / span < 0.38;
+    const isPinching = pinchDistance / span < 0.55;
+    const fingertipAverage = averagePoint([thumbTip, indexTip, handLandmarks[12], handLandmarks[16], handLandmarks[20]]);
+    const openness = distance(fingertipAverage, wrist) / span;
     const pinchPoint = isPinching
       ? mirrorPoint({
           x: (thumbTip.x + indexTip.x) / 2,
@@ -89,8 +110,10 @@ export function getHandFrames(result: any): HandFrame[] {
     return {
       label,
       landmarks: mirroredLandmarks,
+      palmPoint,
       pinchPoint,
       isPinching,
+      openness,
       handSpan: span,
     };
   });

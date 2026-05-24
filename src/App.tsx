@@ -10,6 +10,20 @@ type BlackHole = {
   lifespan: number;
   radius: number;
   seed: number;
+  velocityX: number;
+  velocityY: number;
+  grabbedBy: number | null;
+};
+
+type Mode = 'multi' | 'solo';
+
+type HandMotion = {
+  palmPoint: Point;
+  time: number;
+  velocityX: number;
+  velocityY: number;
+  speed: number;
+  wasGrabbing: boolean;
 };
 
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
@@ -21,6 +35,33 @@ function makeStarfield(): Star[] {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function getDistance(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function isHoleInRange(hole: BlackHole, hand: HandFrame, frameWidth: number, frameHeight: number): boolean {
+  const handPoint = {
+    x: hand.palmPoint.x * frameWidth,
+    y: hand.palmPoint.y * frameHeight,
+  };
+  return getDistance(handPoint, { x: hole.x, y: hole.y }) < hole.radius * 1.5;
+}
+
+function createHole(point: Point, handSpan: number, width: number, height: number, now: number): BlackHole {
+  return {
+    id: now,
+    x: point.x * width,
+    y: point.y * height,
+    createdAt: now,
+    lifespan: 3200 + handSpan * 1200,
+    radius: Math.min(width, height) * (0.07 + handSpan * 0.12),
+    seed: Math.random() * Math.PI * 2,
+    velocityX: 0,
+    velocityY: 0,
+    grabbedBy: null,
+  };
 }
 
 function drawBlackHole(
@@ -140,10 +181,14 @@ export default function App() {
   const starsRef = useRef<Star[]>(makeStarfield());
   const handsRef = useRef<HandFrame[]>([]);
   const holesRef = useRef<BlackHole[]>([]);
+  const soloHoleRef = useRef<BlackHole | null>(null);
+  const handMotionRef = useRef<Record<number, HandMotion | undefined>>({});
   const pinchStatesRef = useRef<boolean[]>([]);
   const holeIdRef = useRef(1);
   const streamRef = useRef<MediaStream | null>(null);
+  const modeRef = useRef<Mode>('multi');
 
+  const [mode, setMode] = useState<Mode>('multi');
   const [status, setStatus] = useState('Starting camera...');
   const [error, setError] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -206,26 +251,109 @@ export default function App() {
     };
 
     const spawnHole = (point: Point, handSpan: number, width: number, height: number, now: number) => {
-      const radius = Math.min(width, height) * (0.07 + handSpan * 0.12);
       if (soundEnabledRef.current) {
         triggerSound(96 + handSpan * 90, 0.14, 'sine', 0.05);
         window.setTimeout(() => {
           triggerSound(320 + handSpan * 220, 0.12, 'triangle', 0.025);
         }, 24);
       }
-      holesRef.current = [
-        ...holesRef.current.filter((hole) => now - hole.createdAt < hole.lifespan),
-        {
-          id: holeIdRef.current,
-          x: point.x * width,
-          y: point.y * height,
-          createdAt: now,
-          lifespan: 3200 + handSpan * 1200,
-          radius,
-          seed: Math.random() * Math.PI * 2,
-        },
-      ].slice(-10);
+
+      if (modeRef.current === 'solo' && soloHoleRef.current) {
+        return;
+      }
+
+      const hole = createHole(point, handSpan, width, height, now);
+      hole.id = holeIdRef.current;
       holeIdRef.current += 1;
+
+      if (mode === 'solo') {
+        soloHoleRef.current = hole;
+        return;
+      }
+
+      holesRef.current = [...holesRef.current.filter((currentHole) => now - currentHole.createdAt < currentHole.lifespan), hole].slice(-10);
+    };
+
+    const updateSoloHole = (hands: HandFrame[], width: number, height: number, now: number) => {
+      const hole = soloHoleRef.current;
+      if (!hole) {
+        return;
+      }
+
+      let grabbedBy: number | null = hole.grabbedBy;
+      let shouldDelete = false;
+
+      hands.forEach((hand, index) => {
+        const handPoint = {
+          x: hand.palmPoint.x * width,
+          y: hand.palmPoint.y * height,
+        };
+        const previous = handMotionRef.current[index];
+        const deltaTime = previous ? Math.max(0.016, (now - previous.time) / 1000) : 0.016;
+        const velocityX = previous ? (handPoint.x - previous.palmPoint.x) / deltaTime : 0;
+        const velocityY = previous ? (handPoint.y - previous.palmPoint.y) / deltaTime : 0;
+        const speed = Math.hypot(velocityX, velocityY);
+        const isGrabbing = hand.openness < 1.35;
+        const isSlashing = !isGrabbing && hand.openness > 1.65 && speed > 1100 && Math.abs(velocityX) > Math.abs(velocityY) * 0.7;
+        const isFlicking = previous?.wasGrabbing && !isGrabbing && speed > 900;
+
+        if (isSlashing && isHoleInRange(hole, hand, width, height)) {
+          shouldDelete = true;
+          return;
+        }
+
+        if (isGrabbing && isHoleInRange(hole, hand, width, height)) {
+          grabbedBy = index;
+          hole.x = handPoint.x;
+          hole.y = handPoint.y;
+          const minDimension = Math.min(width, height);
+          hole.radius = clamp(minDimension * (0.035 + hand.openness * 0.014), minDimension * 0.03, minDimension * 0.18);
+        }
+
+        if (grabbedBy === index && isFlicking) {
+          grabbedBy = null;
+          hole.velocityX = velocityX * 0.36;
+          hole.velocityY = velocityY * 0.36;
+        }
+
+        handMotionRef.current[index] = {
+          palmPoint: handPoint,
+          time: now,
+          velocityX,
+          velocityY,
+          speed,
+          wasGrabbing: isGrabbing,
+        };
+      });
+
+      if (shouldDelete) {
+        soloHoleRef.current = null;
+        return;
+      }
+
+      hole.grabbedBy = grabbedBy;
+
+      if (hole.grabbedBy === null) {
+        hole.x += hole.velocityX * 0.016;
+        hole.y += hole.velocityY * 0.016;
+        hole.velocityX *= 0.985;
+        hole.velocityY *= 0.985;
+
+        const bounceX = hole.x - hole.radius < 0 || hole.x + hole.radius > width;
+        const bounceY = hole.y - hole.radius < 0 || hole.y + hole.radius > height;
+
+        if (bounceX) {
+          hole.velocityX *= -0.82;
+          hole.x = clamp(hole.x, hole.radius, width - hole.radius);
+        }
+
+        if (bounceY) {
+          hole.velocityY *= -0.82;
+          hole.y = clamp(hole.y, hole.radius, height - hole.radius);
+        }
+      }
+
+      soloHoleRef.current = hole;
     };
 
     const resizeCanvas = (canvas: HTMLCanvasElement, video: HTMLVideoElement) => {
@@ -272,6 +400,13 @@ export default function App() {
       const result = landmarker.detectForVideo(video, now);
       const nextHands = getHandFrames(result);
 
+      if (modeRef.current === 'solo' && !soloHoleRef.current) {
+        const pinchingHand = nextHands.find((hand) => hand.isPinching && hand.pinchPoint);
+        if (pinchingHand?.pinchPoint) {
+          spawnHole(pinchingHand.pinchPoint, pinchingHand.handSpan, frame.width, frame.height, now);
+        }
+      }
+
       nextHands.forEach((hand, index) => {
         const wasPinching = pinchStatesRef.current[index] ?? false;
         if (hand.isPinching && !wasPinching && hand.pinchPoint) {
@@ -283,7 +418,14 @@ export default function App() {
       handsRef.current = nextHands;
       holesRef.current = holesRef.current.filter((hole) => now - hole.createdAt < hole.lifespan);
 
-      drawScene(frame.context, frame.width, frame.height, starsRef.current, handsRef.current, holesRef.current, now);
+      if (modeRef.current === 'solo') {
+        updateSoloHole(nextHands, frame.width, frame.height, now);
+      }
+
+      const activeHoles = modeRef.current === 'solo'
+        ? (soloHoleRef.current ? [soloHoleRef.current] : holesRef.current.slice(-1))
+        : holesRef.current;
+      drawScene(frame.context, frame.width, frame.height, starsRef.current, handsRef.current, activeHoles, now);
     };
 
     const tick = () => {
@@ -347,7 +489,7 @@ export default function App() {
         }
 
         handLandmarkerRef.current = landmarker;
-        setStatus('Pinch your fingers to open a black hole.');
+        setStatus(modeRef.current === 'solo' ? 'One-hole mode: pinch to create, grab to resize, flick to throw, slash to delete.' : 'Pinch your fingers to open a black hole.');
         tick();
       } catch (cause) {
         const message = cause instanceof Error ? cause.message : 'Unable to start the camera.';
@@ -388,6 +530,30 @@ export default function App() {
             <span className="stat-value">{status}</span>
           </div>
 
+          <div className="mode-switcher">
+            <button className={mode === 'multi' ? 'mode-button is-active' : 'mode-button'} type="button" onClick={() => {
+              modeRef.current = 'multi';
+              soloHoleRef.current = null;
+              handMotionRef.current = {};
+              pinchStatesRef.current = [];
+              setMode('multi');
+              setStatus('Multi-hole mode: pinch to spawn black holes.');
+            }}>
+              Multi-hole mode
+            </button>
+            <button className={mode === 'solo' ? 'mode-button is-active' : 'mode-button'} type="button" onClick={() => {
+              modeRef.current = 'solo';
+              holesRef.current = [];
+              soloHoleRef.current = null;
+              handMotionRef.current = {};
+              pinchStatesRef.current = [];
+              setMode('solo');
+              setStatus('One-hole mode: pinch to create the hole, grab to resize, flick to throw, slash to delete.');
+            }}>
+              One-hole mode
+            </button>
+          </div>
+
           <button className="sound-button" type="button" onClick={() => void enableSound()}>
             {soundEnabled ? 'Sound active' : 'Enable sound'}
           </button>
@@ -395,15 +561,15 @@ export default function App() {
           <div className="guide-list">
             <div>
               <strong>1</strong>
-              <span>Allow webcam access.</span>
+              <span>Allow webcam access and pick a mode.</span>
             </div>
             <div>
               <strong>2</strong>
-              <span>Bring one or two hands into view.</span>
+              <span>In one-hole mode, bring thumb and index finger close together to create the hole, then grab it to resize or move it.</span>
             </div>
             <div>
               <strong>3</strong>
-              <span>Pinch to spawn a black hole.</span>
+              <span>Flick the hole to throw it, slash it to delete it.</span>
             </div>
           </div>
 
@@ -416,8 +582,8 @@ export default function App() {
             <canvas ref={canvasRef} className="overlay" />
 
             <div className="hud hud-top-left">Selfie view</div>
-            <div className="hud hud-top-right">Gesture: pinch</div>
-            <div className="hud hud-bottom-left">Hands tracked live</div>
+            <div className="hud hud-top-right">Gesture: {mode === 'solo' ? 'pinch / grab / flick / slash' : 'pinch'}</div>
+            <div className="hud hud-bottom-left">{mode === 'solo' ? 'One hole active' : 'Hands tracked live'}</div>
           </div>
         </section>
       </section>
