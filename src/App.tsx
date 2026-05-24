@@ -135,6 +135,8 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const animationRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const soundEnabledRef = useRef(false);
   const starsRef = useRef<Star[]>(makeStarfield());
   const handsRef = useRef<HandFrame[]>([]);
   const holesRef = useRef<BlackHole[]>([]);
@@ -144,6 +146,56 @@ export default function App() {
 
   const [status, setStatus] = useState('Starting camera...');
   const [error, setError] = useState<string | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
+  const triggerSound = (frequency: number, duration: number, type: OscillatorType, gainValue: number) => {
+    const context = audioContextRef.current;
+    if (!context) {
+      return;
+    }
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const filter = context.createBiquadFilter();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(18, frequency * 0.2), context.currentTime + duration);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(Math.min(1200, frequency * 8), context.currentTime);
+
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(gainValue, context.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(context.destination);
+
+    oscillator.start();
+    oscillator.stop(context.currentTime + duration + 0.03);
+
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
+  };
+
+  const enableSound = async () => {
+    const context = audioContextRef.current ?? new AudioContext();
+    audioContextRef.current = context;
+
+    if (context.state === 'suspended') {
+      await context.resume();
+    }
+
+    soundEnabledRef.current = true;
+    setSoundEnabled(true);
+    setStatus('Sound enabled. Pinch to open a black hole.');
+    triggerSound(220, 0.08, 'sine', 0.02);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +207,12 @@ export default function App() {
 
     const spawnHole = (point: Point, handSpan: number, width: number, height: number, now: number) => {
       const radius = Math.min(width, height) * (0.07 + handSpan * 0.12);
+      if (soundEnabledRef.current) {
+        triggerSound(96 + handSpan * 90, 0.14, 'sine', 0.05);
+        window.setTimeout(() => {
+          triggerSound(320 + handSpan * 220, 0.12, 'triangle', 0.025);
+        }, 24);
+      }
       holesRef.current = [
         ...holesRef.current.filter((hole) => now - hole.createdAt < hole.lifespan),
         {
@@ -309,6 +367,8 @@ export default function App() {
 
       handLandmarkerRef.current?.close();
       handLandmarkerRef.current = null;
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
       stopStream();
     };
   }, []);
@@ -327,6 +387,10 @@ export default function App() {
             <span className="stat-label">Status</span>
             <span className="stat-value">{status}</span>
           </div>
+
+          <button className="sound-button" type="button" onClick={() => void enableSound()}>
+            {soundEnabled ? 'Sound active' : 'Enable sound'}
+          </button>
 
           <div className="guide-list">
             <div>
