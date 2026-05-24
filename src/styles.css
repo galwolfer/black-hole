@@ -1,0 +1,326 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  color-scheme: dark;
+  --bg: #03050b;
+  --bg-2: #0c1021;
+  --panel: rgba(9, 13, 25, 0.72);
+  --panel-strong: rgba(13, 18, 35, 0.88);
+  --line: rgba(167, 226, 255, 0.16);
+  --text: #e9f4ff;
+  --muted: rgba(233, 244, 255, 0.74);
+  --accent: #8fe7ff;
+  --accent-2: #ffad7d;
+  --danger: #ff9e87;
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(72, 109, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 80% 28%, rgba(121, 255, 243, 0.14), transparent 20%),
+    radial-gradient(circle at 50% 110%, rgba(255, 136, 90, 0.14), transparent 28%),
+    linear-gradient(180deg, #02040a 0%, #050713 48%, #020308 100%);
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: -20vmax;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::before {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(132, 203, 255, 0.22), transparent 18%),
+    radial-gradient(circle at 70% 25%, rgba(255, 177, 122, 0.16), transparent 14%),
+    radial-gradient(circle at 55% 75%, rgba(114, 188, 255, 0.12), transparent 22%);
+  filter: blur(38px);
+  animation: drift 18s ease-in-out infinite alternate;
+}
+
+body::after {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  opacity: 0.09;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 82%);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  align-items: center;
+  padding: 24px;
+}
+
+.frame {
+  width: min(1220px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.panel,
+.video-shell {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(12, 15, 28, 0.78), rgba(8, 10, 18, 0.68));
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(18px);
+}
+
+.panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: rise 800ms ease both;
+}
+
+.panel::after {
+  content: '';
+  position: absolute;
+  inset: auto -24% -36% auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(143, 231, 255, 0.22) 0%, rgba(143, 231, 255, 0.02) 58%, transparent 68%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+  font-size: 0.72rem;
+}
+
+h1 {
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  line-height: 0.9;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.lede {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.75;
+  max-width: 34ch;
+}
+
+.stat-card {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-label {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.7rem;
+  color: rgba(233, 244, 255, 0.62);
+}
+
+.stat-value {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.guide-list {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-list div {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.guide-list strong {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--bg);
+  background: linear-gradient(180deg, var(--accent), #d2f8ff);
+  font-size: 0.78rem;
+}
+
+.guide-list span,
+.hint,
+.error {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.stage {
+  animation: rise 1000ms ease 70ms both;
+}
+
+.video-shell {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: 34px;
+}
+
+.video-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.03), transparent 58%),
+    linear-gradient(135deg, rgba(143, 231, 255, 0.08), transparent 35%, rgba(255, 173, 125, 0.08));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.camera,
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camera {
+  object-fit: cover;
+  transform: scaleX(-1);
+  filter: saturate(1.08) contrast(1.06) brightness(0.94);
+}
+
+.overlay {
+  pointer-events: none;
+  z-index: 2;
+}
+
+.hud {
+  position: absolute;
+  z-index: 3;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(4, 7, 14, 0.5);
+  color: rgba(233, 244, 255, 0.82);
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hud-top-left {
+  top: 18px;
+  left: 18px;
+}
+
+.hud-top-right {
+  top: 18px;
+  right: 18px;
+}
+
+.hud-bottom-left {
+  bottom: 18px;
+  left: 18px;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(2%, 1.5%, 0) scale(1.08);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 980px) {
+  .frame {
+    grid-template-columns: 1fr;
+  }
+
+  .video-shell {
+    aspect-ratio: 4 / 5;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 14px;
+  }
+
+  .panel,
+  .video-shell {
+    border-radius: 24px;
+  }
+
+  .panel {
+    padding: 22px;
+  }
+
+  .hud {
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+  }
+}
