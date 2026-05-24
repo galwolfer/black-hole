@@ -46,7 +46,7 @@ function isHoleInRange(hole: BlackHole, hand: HandFrame, frameWidth: number, fra
     x: hand.palmPoint.x * frameWidth,
     y: hand.palmPoint.y * frameHeight,
   };
-  return getDistance(handPoint, { x: hole.x, y: hole.y }) < hole.radius * 0.7;
+  return getDistance(handPoint, { x: hole.x, y: hole.y }) < hole.radius * 0.6;
 }
 
 function createHole(point: Point, handSpan: number, width: number, height: number, now: number): BlackHole {
@@ -282,6 +282,14 @@ export default function App() {
 
       let grabbedBy: number | null = hole.grabbedBy;
       let shouldDelete = false;
+      const grabbingHands: Array<{
+        index: number;
+        handPoint: Point;
+        speed: number;
+        velocityX: number;
+        velocityY: number;
+      }> = [];
+      const flickCandidates: Array<{ velocityX: number; velocityY: number; speed: number }> = [];
 
       hands.forEach((hand, index) => {
         const handPoint = {
@@ -303,17 +311,17 @@ export default function App() {
         }
 
         if (isGrabbing && isHoleInRange(hole, hand, width, height)) {
-          grabbedBy = index;
-          hole.x = handPoint.x;
-          hole.y = handPoint.y;
-          const minDimension = Math.min(width, height);
-          hole.radius = clamp(minDimension * (0.035 + hand.openness * 0.014), minDimension * 0.03, minDimension * 0.18);
+          grabbingHands.push({
+            index,
+            handPoint,
+            speed,
+            velocityX,
+            velocityY,
+          });
         }
 
-        if (grabbedBy === index && isFlicking) {
-          grabbedBy = null;
-          hole.velocityX = velocityX * 0.36;
-          hole.velocityY = velocityY * 0.36;
+        if (isFlicking && isHoleInRange(hole, hand, width, height)) {
+          flickCandidates.push({ velocityX, velocityY, speed });
         }
 
         handMotionRef.current[index] = {
@@ -331,9 +339,37 @@ export default function App() {
         return;
       }
 
-      hole.grabbedBy = grabbedBy;
+      if (grabbingHands.length >= 2) {
+        const firstHand = grabbingHands[0];
+        const secondHand = grabbingHands[1];
+        grabbedBy = firstHand.index;
+        hole.x = (firstHand.handPoint.x + secondHand.handPoint.x) / 2;
+        hole.y = (firstHand.handPoint.y + secondHand.handPoint.y) / 2;
+        const minDimension = Math.min(width, height);
+        const separation = getDistance(firstHand.handPoint, secondHand.handPoint);
+        hole.radius = clamp(separation * 0.45, minDimension * 0.04, minDimension * 0.2);
+      } else if (grabbingHands.length === 1) {
+        const singleHand = grabbingHands[0];
+        grabbedBy = singleHand.index;
+        hole.x = singleHand.handPoint.x;
+        hole.y = singleHand.handPoint.y;
+        const minDimension = Math.min(width, height);
+        hole.radius = clamp(minDimension * (0.04 + Math.min(1.6, singleHand.speed / 1200) * 0.01), minDimension * 0.03, minDimension * 0.18);
+      } else {
+        hole.grabbedBy = null;
+      }
+
+      if (grabbedBy !== null) {
+        hole.grabbedBy = grabbedBy;
+      }
 
       if (hole.grabbedBy === null) {
+        if (flickCandidates.length > 0) {
+          const flick = flickCandidates.sort((left, right) => right.speed - left.speed)[0];
+          hole.velocityX = flick.velocityX * 0.42;
+          hole.velocityY = flick.velocityY * 0.42;
+        }
+
         hole.x += hole.velocityX * 0.016;
         hole.y += hole.velocityY * 0.016;
         hole.velocityX *= 0.985;
