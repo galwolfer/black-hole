@@ -3,6 +3,7 @@ import { SoundEngine } from './audio/sounds';
 import { GestureEngine } from './gesture/engine';
 import { useCamera } from './hooks/useCamera';
 import { useHandLandmarker } from './hooks/useHandLandmarker';
+import { drawDebugHud } from './render/debugHud';
 import { drawScene } from './render/scene';
 import { generateStars, StarfieldRenderer } from './render/starfield';
 import { createWorld, stepWorld, type Mode, type World } from './sim/world';
@@ -15,6 +16,8 @@ export default function App() {
   const starfieldRef = useRef(new StarfieldRenderer(generateStars(96)));
   const soundRef = useRef(new SoundEngine());
   const lastFrameMsRef = useRef<number | null>(null);
+  const fpsRef = useRef({ frames: 0, lastSample: 0, value: 0 });
+  const debugEnabled = new URLSearchParams(window.location.search).has('debug');
 
   const [mode, setMode] = useState<Mode>('multi');
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -84,6 +87,17 @@ export default function App() {
       if (outcome.slashed) sound.playSlash();
 
       drawScene(ctx, width, height, starfieldRef.current, hands, worldRef.current.holes, now);
+
+      if (debugEnabled) {
+        const fps = fpsRef.current;
+        fps.frames += 1;
+        if (now - fps.lastSample > 500) {
+          fps.value = (fps.frames * 1000) / (now - fps.lastSample);
+          fps.frames = 0;
+          fps.lastSample = now;
+        }
+        drawDebugHud(ctx, hands, fps.value, width);
+      }
     };
 
     tick();
@@ -93,7 +107,7 @@ export default function App() {
       window.cancelAnimationFrame(animationFrame);
       void soundRef.current.close();
     };
-  }, [detect]);
+  }, [detect, debugEnabled]);
 
   return (
     <main className="app-shell">
