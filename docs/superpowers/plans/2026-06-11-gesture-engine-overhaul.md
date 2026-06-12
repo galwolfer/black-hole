@@ -1731,9 +1731,10 @@ export function stepWorld(
           if (hole.grabbedBy === event.handId) {
             hole.grabbedBy = null;
             if (event.type === 'grabEnd' && event.peakSpeed > 1e-6) {
-              // releaseVelocity is in frame-widths/sec; convert to px/sec.
+              // releaseVelocity is in normalized frame-fractions/sec; convert each
+              // axis to px/sec by its own dimension (x by width, y by height).
               hole.velocityX = event.releaseVelocity.x * width * SIM_CONFIG.flickVelocityScale;
-              hole.velocityY = event.releaseVelocity.y * width * SIM_CONFIG.flickVelocityScale;
+              hole.velocityY = event.releaseVelocity.y * height * SIM_CONFIG.flickVelocityScale;
               result.flicked = true;
             }
           }
