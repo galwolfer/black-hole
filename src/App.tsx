@@ -5,7 +5,7 @@ import { useCamera } from './hooks/useCamera';
 import { useHandLandmarker } from './hooks/useHandLandmarker';
 import { drawDebugHud } from './render/debugHud';
 import { drawScene } from './render/scene';
-import { generateStars, StarfieldRenderer } from './render/starfield';
+import { generateStars, StarfieldRenderer, updateStars } from './render/starfield';
 import { createWorld, stepWorld, type Mode, type World } from './sim/world';
 
 export default function App() {
@@ -85,6 +85,19 @@ export default function App() {
       if (outcome.grabbed) sound.playGrab();
       if (outcome.flicked) sound.playFlick();
       if (outcome.slashed) sound.playSlash();
+
+      // Only while holes exist: pull the starfield in and force a layer
+      // rebuild (96 arcs/frame). Idle frames keep the cheap cached path.
+      if (worldRef.current.holes.length > 0) {
+        updateStars(
+          starfieldRef.current.stars,
+          worldRef.current.holes,
+          dt,
+          width,
+          height,
+        );
+        starfieldRef.current.invalidate();
+      }
 
       drawScene(ctx, width, height, starfieldRef.current, hands, worldRef.current.holes, now);
 
