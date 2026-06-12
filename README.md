@@ -4,10 +4,26 @@ Camera-driven hand tracking demo that lets you pinch in front of the webcam to o
 
 ## What it does
 
-- Uses your webcam as the input source.
-- Recognizes up to two hands with MediaPipe Tasks Vision.
-- Triggers a black hole effect when a pinch gesture is detected.
-- Renders a mirrored selfie view with an overlayed cosmic effect.
+- Uses your webcam as the input source and tracks up to two hands with MediaPipe Tasks Vision.
+- A filtered, state-machine gesture engine recognizes four gestures:
+  - **Pinch** (thumb + index together) — opens a black hole.
+  - **Fist near a hole** — grabs it; move your fist to drag it. Two fists on one hole stretch it.
+  - **Open your fist fast** — flicks the hole, which then glides and bounces off the edges.
+  - **Swipe an open hand through a hole** — deletes it.
+- Black holes bend and swallow the starfield around them.
+- Renders a mirrored selfie view with an overlaid cosmic effect and per-gesture audio.
+
+## Gesture vocabulary
+
+| Gesture | Action |
+| --- | --- |
+| Pinch thumb + index | Spawn a black hole |
+| Make a fist near a hole | Grab and drag it |
+| Two fists on one hole | Stretch / resize it |
+| Open the fist quickly | Throw (flick) the hole |
+| Swipe an open hand through a hole | Delete it |
+
+In **multi-hole mode** you can have up to 10 holes at once; in **one-hole mode** a single hole persists until you slash it.
 
 ## How to Start
 
@@ -33,6 +49,23 @@ npm run dev
 - If the camera does not start, make sure the browser has permission to use the webcam.
 - If the page is blank, wait a moment for the hand-tracking model to finish loading.
 - For the best tracking, use bright lighting and keep your hands inside the frame.
+
+## Development
+
+```bash
+npm install
+npm run dev        # local dev server
+npm test           # unit tests (gesture engine, physics, world)
+npm run build      # type-check + production build
+```
+
+Open the app with `?debug=1` to see live gesture telemetry (pinch ratio, finger curl,
+state machines, hand speed) — useful when tuning the constants in `src/gesture/config.ts`.
+
+The codebase is organized into pure, tested modules: `src/gesture/` (filtering, hand
+identity, pinch/grab state machines, motion, engine), `src/sim/` (physics + world
+reducer), `src/render/` (canvas drawing), `src/audio/`, and `src/hooks/` (camera +
+landmarker lifecycle). `src/App.tsx` is a thin composition root.
 
 ## Notes
 
