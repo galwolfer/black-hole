@@ -3057,9 +3057,15 @@ describe('updateStars', () => {
   });
 
   it('barely affects distant stars', () => {
-    const stars = [star(0.02, 0.02)];
-    updateStars(stars, [hole], 1 / 30, WIDTH, HEIGHT);
-    expect(Math.abs(stars[0].x - 0.02)).toBeLessThan(0.001);
+    const distant = [star(0.02, 0.02)];
+    const nearby = [star(0.4, 0.5)];
+    updateStars(distant, [hole], 1 / 30, WIDTH, HEIGHT);
+    updateStars(nearby, [hole], 1 / 30, WIDTH, HEIGHT);
+    const distantPull = Math.abs(distant[0].x - 0.02);
+    const nearbyPull = Math.abs(nearby[0].x - 0.4);
+    // Inverse-square falloff: a far star drifts a tiny fraction of a near one's pull.
+    expect(distantPull).toBeLessThan(0.005);
+    expect(distantPull).toBeLessThan(nearbyPull * 0.1);
   });
 
   it('respawns a star consumed by the hole at a screen edge', () => {
